@@ -1,0 +1,138 @@
+[
+    {
+        "id": "725a433ac58f257e",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "ae156f37966c10fd",
+        "type": "debug",
+        "z": "725a433ac58f257e",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 320,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "c0f2e15904f2c5f5",
+        "type": "function",
+        "z": "725a433ac58f257e",
+        "name": "function 1",
+        "func": "// ===============================\n// CONFIGURAZIONE\n// ===============================\nconst SOGLIA_GAS = 200;\n\n// ===============================\n// LETTURA INPUT\n// ===============================\nlet input = String(msg.payload).trim();\n\nif (!input.startsWith(\"MQ2\")) {\n    return [null, { payload: \"Dato ignorato: \" + input }];\n}\n\nlet valore = parseInt(input.split(\":\")[1]);\n\nif (isNaN(valore)) {\n    return [null, { payload: \"Valore non numerico\" }];\n}\n\n// ===============================\n// STATO VENTOLA\n// ===============================\nlet stato_attuale = context.get(\"ventolaAttiva\") || false;\nlet nuovo_stato = stato_attuale;\n\nlet comando = null;\nlet log = \"\";\n\n// ===============================\n// LOGICA\n// ===============================\nif (valore > SOGLIA_GAS) {\n\n    if (!stato_attuale) {\n        comando = \"FAN_ON\\r\\n\";\n        nuovo_stato = true;\n        log = \"ALLARME → FAN_ON (\" + valore + \")\";\n    } else {\n        log = \"Allarme attivo (\" + valore + \")\";\n    }\n\n} else {\n\n    if (stato_attuale) {\n        comando = \"FAN_OFF\\r\\n\";\n        nuovo_stato = false;\n        log = \"Rientrato → FAN_OFF (\" + valore + \")\";\n    } else {\n        log = \"Valore OK (\" + valore + \")\";\n    }\n}\n\ncontext.set(\"ventolaAttiva\", nuovo_stato);\n\n// ===============================\n// OUTPUT\n// ===============================\nlog = \"Mando Comando: \" + comando;\nreturn [\n    comando ? { payload: comando } : null,\n    { payload: log }\n];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 460,
+        "y": 280,
+        "wires": [
+            [
+                "7e0b523d2be75392"
+            ],
+            [
+                "96a5d183d5e4ecfd"
+            ]
+        ]
+    },
+    {
+        "id": "7e0b523d2be75392",
+        "type": "serial out",
+        "z": "725a433ac58f257e",
+        "name": "DOWN",
+        "serial": "0d6e99c092592dc1",
+        "x": 780,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "96a5d183d5e4ecfd",
+        "type": "debug",
+        "z": "725a433ac58f257e",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 600,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "84f19d9e8aae19f5",
+        "type": "serial in",
+        "z": "725a433ac58f257e",
+        "name": "DOWN",
+        "serial": "0d6e99c092592dc1",
+        "x": 230,
+        "y": 280,
+        "wires": [
+            [
+                "ae156f37966c10fd",
+                "c0f2e15904f2c5f5"
+            ]
+        ]
+    },
+    {
+        "id": "39518aa258c4698b",
+        "type": "function",
+        "z": "725a433ac58f257e",
+        "name": "function 2",
+        "func": "// ===============================\n// CONFIGURAZIONE\n// ===============================\nconst SOGLIA_GAS = 20;   // Soglia di sicurezza\n\n// ===============================\n// LETTURA INPUT\n// ===============================\nlet input = String(msg.payload).trim();\nlet valore_mq2 = null;\n\n// Stato precedente della ventola\nlet stato_attuale = context.get('ventolaAttiva') || false;\nlet nuovo_stato = stato_attuale;\n\nlet comando_out = null;\nlet messaggio_log = \"\";\n\n// ===============================\n// ESTRAZIONE VALORE\n// ===============================\nif (input.startsWith(\"Invio MQ2\")) {\n\n    valore_mq2 = parseInt(input.split(\":\")[1]);\n\n    if (!isNaN(valore_mq2)) {\n\n        // ===============================\n        // LOGICA DI CONFRONTO\n        // ===============================\n        if (valore_mq2 > SOGLIA_GAS) {\n\n            if (!stato_attuale) {\n                comando_out = \"FAN_ON\\n\";\n                nuovo_stato = true;\n                messaggio_log = `ALLARME! Gas: ${valore_mq2} → Invio FAN_ON`;\n            } else {\n                messaggio_log = `Allarme attivo. Gas: ${valore_mq2}`;\n            }\n\n        } else {\n\n            if (stato_attuale) {\n                comando_out = \"FAN_OFF\\n\";\n                nuovo_stato = false;\n                messaggio_log = `Valore OK (${valore_mq2}) → Invio FAN_OFF`;\n            } else {\n                messaggio_log = `Valore OK (${valore_mq2})`;\n            }\n\n        }\n\n    } else {\n        messaggio_log = \"Errore: valore non numerico\";\n    }\n\n} else {\n    messaggio_log = `Dato non valido ricevuto: ${input}`;\n}\n\n// ===============================\n// SALVA NUOVO STATO\n// ===============================\ncontext.set('ventolaAttiva', nuovo_stato);\n\n// ===============================\n// OUTPUT\n// ===============================\n\n// Output 1 → comando Bluetooth\n// Output 2 → log/debug\n\nif (comando_out) {\n    return [\n        { payload: comando_out },\n        { payload: messaggio_log }\n    ];\n} else {\n    return [\n        null,\n        { payload: messaggio_log }\n    ];\n}",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 260,
+        "y": 500,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "0d6e99c092592dc1",
+        "type": "serial-port",
+        "name": "DOWN",
+        "serialport": "COM5",
+        "serialbaud": "9600",
+        "databits": 8,
+        "parity": "none",
+        "stopbits": 1,
+        "waitfor": "",
+        "dtr": "none",
+        "rts": "none",
+        "cts": "none",
+        "dsr": "none",
+        "newline": "\\n",
+        "bin": "false",
+        "out": "char",
+        "addchar": "",
+        "responsetimeout": 10000
+    },
+    {
+        "id": "f00c5cd444ddbfcd",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-node-serialport": "2.0.3"
+        }
+    }
+]
