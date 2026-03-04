@@ -223,7 +223,7 @@ class MQTTManager:
         self.topic_commands = config.TOPIC_COMMANDS
 
         # Crea client MQTT
-        self.client = mqtt.Client()
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
         # Registra callback per gestione messaggi in arrivo
         self.client.on_message = self.on_message
