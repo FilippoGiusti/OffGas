@@ -42,7 +42,7 @@ class Config:
     MQTT_BROKER = "localhost"
     MQTT_PORT = 1883
 
-    TOPIC_TELEMETRY = "garages/G1/telemetry"
+    TOPIC_TELEMETRY = "garages/G1/telemetry" #G1 è il garage di questo purificatore, nel dataset sono presenti G2,G3...
     TOPIC_ALERTS = "garages/G1/alerts"
     TOPIC_COMMANDS = "garages/G1/cmd"
 
@@ -171,9 +171,15 @@ class FanController:
     def __init__(self, bluetooth_manager: BluetoothManager, config: Config):
         self.fan_state = False #False = OFF
         self.bluetooth = bluetooth_manager
+        self.manual_override = False  # True = comandi manuali da MQTT attivi
 
     def update_state(self, anomaly: bool):
-        """Decide se inviare FAN_ON o FAN_OFF."""
+        """Decide se inviare FAN_ON o FAN_OFF.(o in auto mode)"""
+
+        if self.manual_override:
+            # In manual override ignora l'anomaly detector
+            return
+
         if(anomaly == True and self.fan_state == False):
             FanController.force_on(self)
         if(anomaly == False and self.fan_state == True):
@@ -193,8 +199,8 @@ class FanController:
 
 
     def set_auto_mode(self):
-        """Ritorna in modalità automatica."""
-        pass
+        """Disabilita override manuale: torna a modalità automatica."""
+        self.manual_override = False
 
 
 
@@ -205,28 +211,104 @@ class FanController:
 class MQTTManager:
     """Gestisce comunicazione MQTT con Node-RED."""
 
-    def __init__(self, config: Config):
-        pass
+    def __init__(self, config: Config, fan_controller):
+        # Salva configurazione broker e topic
+        self.broker = config.MQTT_BROKER
+        self.port = config.MQTT_PORT
+
+        self.fan_controller = fan_controller
+
+        self.topic_telemetry = config.TOPIC_TELEMETRY
+        self.topic_alerts = config.TOPIC_ALERTS
+        self.topic_commands = config.TOPIC_COMMANDS
+
+        # Crea client MQTT
+        self.client = mqtt.Client()
+
+        # Registra callback per gestione messaggi in arrivo
+        self.client.on_message = self.on_message
 
     def connect(self):
         """Connette al broker MQTT."""
-        pass
+
+        # Connessione al broker
+        self.client.connect(self.broker, self.port)
+
+        # Avvia loop di rete MQTT in thread separato
+        # (gestisce ricezione messaggi e keepalive)
+        self.client.loop_start()
+
 
     def publish_telemetry(self, payload: dict):
         """Pubblica telemetria su topic."""
-        pass
+        # Converte il payload in JSON
+        message = json.dumps(payload)
+
+        # Pubblica sul topic di telemetria
+        self.client.publish(self.topic_telemetry, message)
 
     def publish_alert(self, payload: dict):
         """Pubblica evento di allarme."""
-        pass
+        # Converte payload in JSON
+        message = json.dumps(payload)
+
+        # Pubblica su topic alert
+        self.client.publish(self.topic_alerts, message)
 
     def subscribe_commands(self):
         """Sottoscrive topic comandi manuali."""
-        pass
+
+        # Sottoscrizione al topic da cui arrivano i comandi
+        self.client.subscribe(self.topic_commands)
 
     def on_message(self, client, userdata, msg):
         """Callback per gestione comandi manuali."""
-        pass
+        try:
+            # Decodifica payload ricevuto
+            command = msg.payload.decode("utf-8").strip().upper() #upper così anche se il comando è minuscolo funziona
+
+            print(f"[MQTT COMMAND] Received: {command}")
+
+            # Posso forzare l'avvio o spegnimento  della ventola da Nodered
+            # Esempio logico:
+
+            if command in ("FAN_ON", "ON"):
+                # Override manuale: forza ON
+                self.fan_controller.manual_override = True #lo pongo = True in questo modo forza la ventola a restare sempre ON (o OFF)
+                self.fan_controller.force_on()
+                self.publish_alert({
+                    "garage_id": "G1",
+                    "event": "manual_override",
+                    "command": "FAN_ON",
+                    "timestamp": datetime.datetime.now().isoformat()
+                })
+
+            elif command in ("FAN_OFF", "OFF"):
+                # Override manuale: forza OFF
+                self.fan_controller.manual_override = True
+                self.fan_controller.force_off()
+                self.publish_alert({
+                    "garage_id": "G1",
+                    "event": "manual_override",
+                    "command": "FAN_OFF",
+                    "timestamp": datetime.datetime.now().isoformat()
+                })
+
+            elif command in ("AUTO_MODE", "AUTO"):
+                # Ritorna in automatico (anomaly detector decide al prossimo ciclo)
+                self.fan_controller.set_auto_mode()
+                self.publish_alert({
+                    "garage_id": "G1",
+                    "event": "manual_override",
+                    "command": "AUTO_MODE",
+                    "timestamp": datetime.datetime.now().isoformat()
+                })
+
+            else:
+                print(f"[MQTT COMMAND] Unknown command: {command}")
+
+        except Exception as e:
+            print(f"[MQTT ERROR] {e}")
 
 
 # ===============================
@@ -241,13 +323,19 @@ class Bridge:
         self.bluetooth = BluetoothManager(self.config)
         self.dataset = DatasetManager()
         self.anomaly_detector = AnomalyDetector(self.config)
-        self.mqtt = MQTTManager(self.config)
         self.fan_controller = FanController(self.bluetooth, self.config)
+        self.mqtt = MQTTManager(self.config, self.fan_controller)
         self.running = True
 
     def start(self):
         """Avvia il sistema."""
         self.bluetooth.connect()
+
+        """Connessione al broker MQTT"""
+        self.mqtt.connect()
+
+        """Sottoscrizione ai comandi manuali"""
+        self.mqtt.subscribe_commands()
 
         """Calcola media"""
         self.read_dataset = self.dataset.load_dataset()
@@ -259,6 +347,8 @@ class Bridge:
 
                 if data:
                     self.process_cycle(data)
+
+                time.sleep(0.2) #per rallentare il ciclo
 
         except KeyboardInterrupt:
             self.stop()
@@ -275,9 +365,17 @@ class Bridge:
             print(f"[OK] MQ-2 gas value: {data['gas']} – below anomaly threshold - FAN_OFF")
             self.fan_controller.update_state(anomaly) #Controlla ventola
 
-        """
-        - Pubblica telemetria
-        """
+        # ===============================
+        # Pubblicazione telemetria MQTT
+        # ===============================
+        payload = {
+        "garage_id": "G1",
+        "gas": data["gas"],
+        "timestamp": data["timestamp"],
+        "fan_state": self.fan_controller.fan_state
+        }
+
+        self.mqtt.publish_telemetry(payload)
 
 
     def stop(self):
