@@ -200,7 +200,7 @@ class FanController:
 
     def set_auto_mode(self):
         """Disabilita override manuale: torna a modalità automatica."""
-        self.manual_override = False
+        self.manual_override = False #la ventola torna a spegnersi o accendersi in base la soglia
 
 
 
