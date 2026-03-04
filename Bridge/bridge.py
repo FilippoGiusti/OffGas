@@ -10,7 +10,7 @@ Responsabilità:
 - Pubblicazione MQTT
 - Ricezione comandi manuali
 """
-import sys
+
 
 # ===============================
 # IMPORT LIBRARIES
@@ -18,10 +18,13 @@ import sys
 
 import serial
 import json
+import os
+import sys
 import time
 import datetime
 import statistics
 import threading
+import pandas as pd
 import paho.mqtt.client as mqtt
 
 
@@ -71,7 +74,7 @@ class BluetoothManager:
         """Legge una riga dalla seriale."""
         read_val = self.ser.readline().decode('utf-8').strip()
 
-        if read_val.startswith("MQ2:"):
+        if read_val.startswith("MQ2:"): #MQ2 è il nome del sensore di gas utilizzato
             try:
                 val_gas = int(read_val.split(':',1)[1])
                 timestamp = datetime.datetime.now().isoformat()
@@ -89,7 +92,10 @@ class BluetoothManager:
 
     def send_command(self, command: str):
         """Invia comando ad Arduino (FAN_ON / FAN_OFF)."""
-        pass
+        if not self.ser:
+            raise RuntimeError("Bluetooth not connected")
+
+        self.ser.write(command.encode("utf-8"))
 
 
 # ===============================
@@ -100,20 +106,38 @@ class DatasetManager:
     """Gestisce valori altri garage (simulazione o CSV)."""
 
     def __init__(self):
-        pass
+        # Ottiene il percorso assoluto del file Python corrente (dataset_manager.py)
+        # __file__ → path del file corrente
+        # os.path.abspath(...) → converte in percorso assoluto
+        # os.path.dirname(...) → prende solo la directory che contiene il file
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        self.dataset = os.path.normpath(os.path.join(
+            base_dir,
+            "..",
+            "dataset_other_garage",
+            "dataset_low_pollution.csv"
+        ))
 
     def load_dataset(self):
         """Carica dataset da file o inizializza simulazione."""
-        pass
+        if not os.path.exists(self.dataset):
+            raise FileNotFoundError(
+                f"Dataset file not found: {self.dataset}"
+            )
+        df = pd.read_csv(self.dataset, sep=',')
 
-    def get_current_values(self):
-        """Restituisce lista valori correnti altri garage."""
-        pass
+        if df.empty:
+            raise ValueError(
+                f"Dataset is empty: {self.dataset}"
+            )
 
-    def compute_statistics(self, values):
-        """Calcola media e deviazione standard."""
-        pass
+        others_mean = df['gas_value'].mean() #calcolo la media dei valori degli altri garage
+        others_std = df['gas_value'].std() #calcolo la deviazione standard degli altri garage
 
+        return {
+            "others_mean": others_mean,
+            "others_std": others_std
+        }
 
 # ===============================
 # ANOMALY DETECTOR
@@ -123,11 +147,18 @@ class AnomalyDetector:
     """Contiene la logica di decisione anomalia."""
 
     def __init__(self, config: Config):
-        pass
+        self.k = config.ANOMALY_FACTOR
 
-    def check_anomaly(self, my_gas, others_mean, others_std=None):
+
+    def check_anomaly(self, my_gas, others_mean):
         """Restituisce True/False in base alla regola scelta."""
-        pass
+        if(my_gas > others_mean*self.k):
+            return True
+        else:
+            return False
+
+
+
 
 
 # ===============================
@@ -138,23 +169,33 @@ class FanController:
     """Gestisce stato ventola e prevenzione oscillazioni."""
 
     def __init__(self, bluetooth_manager: BluetoothManager, config: Config):
-        pass
+        self.fan_state = False #False = OFF
+        self.bluetooth = bluetooth_manager
 
     def update_state(self, anomaly: bool):
         """Decide se inviare FAN_ON o FAN_OFF."""
-        pass
+        if(anomaly == True and self.fan_state == False):
+            FanController.force_on(self)
+        if(anomaly == False and self.fan_state == True):
+            FanController.force_off(self)
+
 
     def force_on(self):
-        """Forza accensione manuale."""
-        pass
+        """Forza accensione"""
+        self.fan_state = True
+        self.bluetooth.send_command("FAN_ON\n")
+
 
     def force_off(self):
-        """Forza spegnimento manuale."""
-        pass
+        """Forza spegnimento"""
+        self.fan_state = False
+        self.bluetooth.send_command("FAN_OFF\n")
+
 
     def set_auto_mode(self):
         """Ritorna in modalità automatica."""
         pass
+
 
 
 # ===============================
@@ -202,44 +243,49 @@ class Bridge:
         self.anomaly_detector = AnomalyDetector(self.config)
         self.mqtt = MQTTManager(self.config)
         self.fan_controller = FanController(self.bluetooth, self.config)
-
         self.running = True
 
     def start(self):
         """Avvia il sistema."""
         self.bluetooth.connect()
 
+        """Calcola media"""
+        self.read_dataset = self.dataset.load_dataset()
+
         try:
-            while self:
+            while self.running:
+                """legge valore gas"""
                 data = self.bluetooth.read_line()
 
                 if data:
-                    print(data["gas"])
-                    # qui fai:
-                    # - calcolo media
-                    # - controllo anomalia
-                    # - invio fan
-                    # - publish mqtt
-                    pass
+                    self.process_cycle(data)
 
         except KeyboardInterrupt:
-            print("Arresto manuale")
-            self.bluetooth.ser.close()
+            self.stop()
 
 
-    def process_cycle(self):
-        """Ciclo principale:
-        - Legge gas
-        - Calcola media
-        - Verifica anomalia
-        - Controlla ventola
+    def process_cycle(self, data):
+
+        """Verifica anomalia"""
+        anomaly = self.anomaly_detector.check_anomaly(data["gas"],int(self.read_dataset['others_mean']))
+        if(anomaly == True):
+            print(f"[ANOMALY] MQ-2 gas value: {data['gas']} – threshold exceeded - FAN_ON")
+            self.fan_controller.update_state(anomaly) #Controlla ventola
+        else:
+            print(f"[OK] MQ-2 gas value: {data['gas']} – below anomaly threshold - FAN_OFF")
+            self.fan_controller.update_state(anomaly) #Controlla ventola
+
+        """
         - Pubblica telemetria
         """
-        pass
+
 
     def stop(self):
         """Arresta il sistema."""
-        pass
+        print("Arresto manuale")
+        self.fan_controller.force_off()
+        self.bluetooth.ser.close()
+
 
 
 # ===============================
