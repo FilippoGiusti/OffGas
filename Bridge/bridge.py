@@ -25,6 +25,7 @@ import datetime
 import statistics
 import threading
 import pandas as pd
+from collections import deque
 import paho.mqtt.client as mqtt
 
 
@@ -46,7 +47,7 @@ class Config:
     TOPIC_ALERTS = "garages/G1/alerts"
     TOPIC_COMMANDS = "garages/G1/cmd"
 
-    ANOMALY_FACTOR = 1.5
+    ANOMALY_FACTOR = 1.5 #lo imponiamo di 1.5, verrà moltiplicato per la media. Se la media è 100 basta 150 per accendere la ventola
     COOLDOWN_SECONDS = 5
 
 
@@ -310,6 +311,87 @@ class MQTTManager:
         except Exception as e:
             print(f"[MQTT ERROR] {e}")
 
+# ===============================
+# GAS PREDICTOR
+# ===============================
+
+class GasPredictor:
+    """
+    Predice andamento del gas usando:
+    - moving average
+    - velocità di crescita
+    """
+
+    def __init__(self, config: Config):
+
+        # Numero di valori storici utilizzati
+        self.window_size = 20
+
+        # Orizzonte temporale della predizione
+        # Abbiamo impostato nel ciclo un time.sleep(0.2), quindi ogni 0.2 secondi ho un ciclo. Prevedere il valore del gas tra 150 cicli significa prevedere il valore del gas tra 30 secondi --> 30 secondi / 0.2 sec ciclo ≈ 150 step
+        self.prediction_steps = 150
+
+        # History dei valori gas -> tiene traccia dei valori passati del gas (ultimi 20 valori se window size = 20)
+        self.gas_history = deque(maxlen=self.window_size) #deque: è una coda dimensionale, aggiunge elementi sia a destra che a sinistra, più immediato che usare una lista
+
+        # Media mobile precedente
+        self.previous_moving_avg = None
+
+
+    def update(self, gas_value, threshold):
+        """
+        Aggiorna history e calcola predizione.
+        """
+
+        # Aggiunge nuovo valore alla history
+        self.gas_history.append(gas_value)
+
+        # Non predice se non ci sono abbastanza dati
+        if len(self.gas_history) < 5:
+            return {
+                "predicted_gas": gas_value,
+                "predicted_crossing": False
+            }
+
+        # ===============================
+        # Calcolo moving average
+        # ===============================
+        moving_avg = sum(self.gas_history) / len(self.gas_history) #calcolo la media sugli ultimi 20 valori
+
+        # Prima iterazione
+        if self.previous_moving_avg is None:
+            self.previous_moving_avg = moving_avg
+            return {
+                "predicted_gas": gas_value,
+                "predicted_crossing": False
+            }
+
+        # ===============================
+        # Velocità di crescita
+        # ===============================
+        growth_rate = moving_avg - self.previous_moving_avg #misuro quanto sta crescendo il mio livello di gas
+
+        # Aggiorna media precedente
+        self.previous_moving_avg = moving_avg
+
+        # ===============================
+        # Predizione valore futuro
+        # ===============================
+        predicted_gas = gas_value + (growth_rate * self.prediction_steps) #predico il valore di gas che avrò tra 30sec
+
+        # ===============================
+        # Verifica superamento soglia
+        # ===============================
+        if(predicted_gas > threshold):
+            predicted_crossing = True
+        else:
+            predicted_crossing = False
+
+        return {
+            "predicted_gas": int(predicted_gas),
+            "predicted_crossing": predicted_crossing #se True devo accendere la ventola
+        }
+
 
 # ===============================
 # BRIDGE CORE
@@ -323,6 +405,7 @@ class Bridge:
         self.bluetooth = BluetoothManager(self.config)
         self.dataset = DatasetManager()
         self.anomaly_detector = AnomalyDetector(self.config)
+        self.predictor = GasPredictor(self.config)
         self.fan_controller = FanController(self.bluetooth, self.config)
         self.mqtt = MQTTManager(self.config, self.fan_controller)
         self.running = True
@@ -356,21 +439,36 @@ class Bridge:
 
     def process_cycle(self, data):
 
+        """Predizione del valore di gas tra 30 sec"""
+
+        prediction = self.predictor.update(data["gas"],int(self.read_dataset['others_mean']) * self.config.ANOMALY_FACTOR)
+
+        predicted_gas = prediction["predicted_gas"]
+        predicted_crossing = prediction["predicted_crossing"] #devo accendere la ventola preventiva?
+
         """Verifica anomalia"""
+
         anomaly = self.anomaly_detector.check_anomaly(data["gas"],int(self.read_dataset['others_mean']))
-        if(anomaly == True):
-            print(f"[ANOMALY] MQ-2 gas value: {data['gas']} – threshold exceeded - FAN_ON")
-            self.fan_controller.update_state(anomaly) #Controlla ventola
+
+        if anomaly or predicted_crossing:
+            self.fan_controller.update_state(True)
+            if predicted_crossing:
+                print(f"[ANOMALY_PREDICTION] MQ-2 predicted gas value: {predicted_gas} threshold = {int(self.read_dataset['others_mean']) * self.config.ANOMALY_FACTOR} – threshold will be exceeded - FAN_ON")
+            else:
+                print(f"[ANOMALY] MQ-2 gas value: {data['gas']} threshold = {int(self.read_dataset['others_mean']) * self.config.ANOMALY_FACTOR} – threshold exceeded - FAN_ON")
         else:
+            self.fan_controller.update_state(False)
             print(f"[OK] MQ-2 gas value: {data['gas']} – below anomaly threshold - FAN_OFF")
-            self.fan_controller.update_state(anomaly) #Controlla ventola
+
 
         # ===============================
         # Pubblicazione telemetria MQTT
         # ===============================
         payload = {
         "garage_id": "G1",
-        "gas": data["gas"],
+        "gas": data["gas"], #valore del gas attuale
+        "predicted_gas": predicted_gas, #valore del gas predetto tra 30sec
+        "predicted_crossing": predicted_crossing, #devo accendere il valore preventivamente se il valore del gas tra 30sec supera soglia
         "timestamp": data["timestamp"],
         "fan_state": self.fan_controller.fan_state
         }
