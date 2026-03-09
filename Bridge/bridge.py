@@ -1,16 +1,10 @@
 """
-Bridge IoT - Progetto Rilevazione Gas Distribuita
-
-Responsabilità:
-- Connessione Bluetooth con Arduino
-- Lettura valore gas
-- Calcolo media altri garage
-- Regola di anomalia
-- Controllo ventola
-- Pubblicazione MQTT
-- Ricezione comandi manuali
+Responsabilità del Bridge:
+- leggere il valore gas dall'Arduino via Bluetooth
+- pubblicare la telemetria via MQTT
+- ricevere comandi da Node-RED
+- controllare la ventola tramite Arduino
 """
-
 
 # ===============================
 # IMPORT LIBRARIES
@@ -19,13 +13,9 @@ Responsabilità:
 import serial
 import json
 import os
-import sys
 import time
 import datetime
-import statistics
-import threading
 import pandas as pd
-from collections import deque
 import paho.mqtt.client as mqtt
 
 
@@ -72,30 +62,19 @@ class BluetoothManager:
         )
 
     def read_line(self):
-        return {
-                    "gas": 151,
-                    "timestamp": datetime.datetime.now().isoformat()
+        """Legge una riga dalla seriale."""
+        read_val = self.ser.readline().decode('utf-8').strip()
+        if read_val.startswith("MQ2:"): #MQ2 è il nome del sensore di gas utilizzato
+            try:
+                val_gas = int(read_val.split(':',1)[1])
+                timestamp = datetime.datetime.now().isoformat()
+                return {
+                    "gas": val_gas,
+                    "timestamp": timestamp
                 }
-
-    #def read_line(self):
-    #    """Legge una riga dalla seriale."""
-    #    read_val = self.ser.readline().decode('utf-8').strip()
-#
-    #    if read_val.startswith("MQ2:"): #MQ2 è il nome del sensore di gas utilizzato
-    #        try:
-    #            val_gas = int(read_val.split(':',1)[1])
-    #            timestamp = datetime.datetime.now().isoformat()
-#
-    #            return {
-    #                "gas": val_gas,
-    #                "timestamp": timestamp
-    #            }
-#
-    #        except ValueError:
-    #            return None
-#
-    #    return None
-
+            except ValueError:
+                return None
+        return None
 
     def send_command(self, command: str):
         """Invia comando ad Arduino (FAN_ON / FAN_OFF)."""
@@ -146,28 +125,6 @@ class DatasetManager:
             "others_std": others_std
         }
 
-# ===============================
-# ANOMALY DETECTOR
-# ===============================
-
-'''class AnomalyDetector:
-    """Contiene la logica di decisione anomalia."""
-
-    def __init__(self, config: Config):
-        self.k = config.ANOMALY_FACTOR
-
-
-    def check_anomaly(self, my_gas, others_mean):
-        """Restituisce True/False in base alla regola scelta."""
-        if(my_gas > others_mean*self.k):
-            return True
-        else:
-            return False
-'''
-
-
-
-
 
 
 # ===============================
@@ -178,7 +135,7 @@ class FanController:
     """Gestisce stato ventola e prevenzione oscillazioni."""
 
     def __init__(self, bluetooth_manager: BluetoothManager, config: Config):
-        self.fan_state = False #False = OFF
+        self.fan_state = False #False = OFF, utile come info per dashboard da passare a node-red
         self.bluetooth = bluetooth_manager
         self.manual_override = False  # True = comandi manuali da MQTT attivi
 
@@ -207,12 +164,14 @@ class FanController:
 class MQTTManager:
     """Gestisce comunicazione MQTT con Node-RED."""
 
-    def __init__(self, config: Config, fan_controller):
+    def __init__(self, config: Config, fan_controller, bridge):
         # Salva configurazione broker e topic
         self.broker = config.MQTT_BROKER
         self.port = config.MQTT_PORT
 
         self.fan_controller = fan_controller
+
+        self.bridge = bridge
 
         self.topic_telemetry = config.TOPIC_TELEMETRY
         self.topic_alerts = config.TOPIC_ALERTS
@@ -258,23 +217,62 @@ class MQTTManager:
         self.client.subscribe(self.topic_commands)
 
     def on_message(self, client, userdata, msg):
-        """Callback per gestione comandi manuali."""
-        try:
-            # Decodifica payload ricevuto
-            #command = msg.payload.decode("utf-8").strip().upper() #upper così anche se il comando è minuscolo funziona
-            command = json.loads(msg.payload.decode("utf-8"))
+        """
+        Gestisce i messaggi ricevuti dal topic dei comandi.
 
-            print(f"[MQTT COMMAND] Received: {command}")
-            if command["mode"] == "STD":
-                if command["anomaly"]:
-                    print("accendo ciccio")
-                    self.fan_controller.force_on()
-                else:
-                    print("spengo ciccio")
-                    self.fan_controller.force_off()
+        I comandi possono essere:
+        - JSON (STD mode calcolato da Node-RED)
+        - stringa (FAN_ON, FAN_OFF, AUTO)
+        """
+
+        try:
+            # Decodifica il payload MQTT (che arriva come byte) in stringa UTF-8
+            # e rimuove eventuali spazi o newline all'inizio e alla fine
+            raw = msg.payload.decode("utf-8").strip()
+
+            try:
+                # Prova a interpretare la stringa ricevuta come JSON
+                # Questo funziona quando il comando arriva da Node-RED come oggetto JSON,
+                # ad esempio: {"mode": "STD", "anomaly": true}
+
+                command = json.loads(raw)
+
+                # condizione aggiornata: anomaly OR predicted_crossing(arriva nel payload da node-red)
+                if command["mode"] == "STD":
+                    if command["anomaly"] or command["predicted_crossing"]:
+
+                        # Se siamo in manual override ignoriamo i comandi automatici. La ventola resta forzata da node-red
+                        if self.fan_controller.manual_override:
+                            return
+
+                        print(
+                            f"[SERVER] anomaly detected → FAN_ON | gas={self.bridge.last_gas_value} threshold={self.bridge.read_dataset['others_mean']}")
+
+                        print(f"[MQTT COMMAND] Received: {command}")
+
+                        self.fan_controller.force_on()
+
+                    else:
+                        print(
+                            f"[SERVER] normal condition → FAN_OFF | gas={self.bridge.last_gas_value} threshold={self.bridge.read_dataset['others_mean']}")
+
+                        print(f"[MQTT COMMAND] Received: {command}")
+
+                        self.fan_controller.force_off()
+
+                return #importante: serve a uscire dalla funzione perchè ho già interpretato il command
+
+            except json.JSONDecodeError:
+                # Se la conversione JSON fallisce significa che il payload NON è JSON
+                # ma una semplice stringa (es: "FAN_ON", "FAN_OFF", "AUTO")
+                # In questo caso manteniamo la stringa così com'è
+                command = raw
+
+                print(f"[MQTT COMMAND] Received: {command}")
+
+
             # Posso forzare l'avvio o spegnimento  della ventola da Nodered
             # Esempio logico:
-
 
             if command in ("FAN_ON", "ON"):
                 # Override manuale: forza ON
@@ -308,17 +306,6 @@ class MQTTManager:
                     "timestamp": datetime.datetime.now().isoformat()
                 })
 
-            elif command in ("STD_MODE", "STD"):
-                # Ritorna in automatico (anomaly detector decide al prossimo ciclo)
-
-                self.fan_controller.force_on()
-                self.publish_alert({
-                    "garage_id": "G1",
-                    "event": "manual_override",
-                    "command": "STD_MODE",
-                    "timestamp": datetime.datetime.now().isoformat()
-                })
-
             else:
                 print(f"[MQTT COMMAND] Unknown command: {command}")
 
@@ -326,108 +313,33 @@ class MQTTManager:
             print(f"[MQTT ERROR] {e}")
 
 
-# ===============================
-# GAS PREDICTOR
-# ===============================
-
-#class GasPredictor:
-#    """
-#    Predice andamento del gas usando:
-#    - moving average
-#    - velocità di crescita
-#    """
-#
-#    def __init__(self, config: Config):
-#
-#        # Numero di valori storici utilizzati
-#        self.window_size = 20
-#
-#        # Orizzonte temporale della predizione
-#        # Abbiamo impostato nel ciclo un time.sleep(0.2), quindi ogni 0.2 secondi ho un ciclo. Prevedere il valore del gas tra 150 cicli significa prevedere il valore del gas tra 30 secondi --> 30 secondi / 0.2 sec ciclo ≈ 150 step
-#        self.prediction_steps = 150
-#
-#        # History dei valori gas -> tiene traccia dei valori passati del gas (ultimi 20 valori se window size = 20)
-#        self.gas_history = deque(maxlen=self.window_size) #deque: è una coda dimensionale, aggiunge elementi sia a destra che a sinistra, più immediato che usare una lista
-#
-#        # Media mobile precedente
-#        self.previous_moving_avg = None
-#
-#
-#    def update(self, gas_value, threshold):
-#        """
-#        Aggiorna history e calcola predizione.
-#        """
-#
-#        # Aggiunge nuovo valore alla history
-#        self.gas_history.append(gas_value)
-#
-#        # Non predice se non ci sono abbastanza dati
-#        if len(self.gas_history) < 5:
-#            return {
-#                "predicted_gas": gas_value,
-#                "predicted_crossing": False
-#            }
-#
-#        # ===============================
-#        # Calcolo moving average
-#        # ===============================
-#        moving_avg = sum(self.gas_history) / len(self.gas_history) #calcolo la media sugli ultimi 20 valori
-#
-#        # Prima iterazione
-#        if self.previous_moving_avg is None:
-#            self.previous_moving_avg = moving_avg
-#            return {
-#                "predicted_gas": gas_value,
-#                "predicted_crossing": False
-#            }
-#
-#        # ===============================
-#        # Velocità di crescita
-#        # ===============================
-#        growth_rate = moving_avg - self.previous_moving_avg #misuro quanto sta crescendo il mio livello di gas
-#
-#        # Aggiorna media precedente
-#        self.previous_moving_avg = moving_avg
-#
-#        # ===============================
-#        # Predizione valore futuro
-#        # ===============================
-#        predicted_gas = gas_value + (growth_rate * self.prediction_steps) #predico il valore di gas che avrò tra 30sec
-#
-#        # ===============================
-#        # Verifica superamento soglia
-#        # ===============================
-#        if(predicted_gas > threshold):
-#            predicted_crossing = True
-#        else:
-#            predicted_crossing = False
-#
-#        return {
-#            "predicted_gas": int(predicted_gas),
-#            "predicted_crossing": predicted_crossing #se True devo accendere la ventola
-#        }
-
 
 # ===============================
 # BRIDGE CORE
 # ===============================
 
 class Bridge:
-    """Coordina tutti i componenti del sistema."""
+    """
+    Componente centrale del sistema.
+
+    Coordina:
+    - lettura sensore
+    - pubblicazione telemetria
+    - ricezione comandi MQTT
+    """
 
     def __init__(self):
         self.config = Config()
         self.bluetooth = BluetoothManager(self.config)
         self.dataset = DatasetManager()
-        #self.anomaly_detector = AnomalyDetector(self.config)
-        #self.predictor = GasPredictor(self.config)
         self.fan_controller = FanController(self.bluetooth, self.config)
-        self.mqtt = MQTTManager(self.config, self.fan_controller)
+        self.mqtt = MQTTManager(self.config, self.fan_controller, self)
         self.running = True
+        self.last_gas_value = None
 
     def start(self):
         """Avvia il sistema."""
-        #self.bluetooth.connect()
+        self.bluetooth.connect()
 
         """Connessione al broker MQTT"""
         self.mqtt.connect()
@@ -436,7 +348,7 @@ class Bridge:
         self.mqtt.subscribe_commands()
 
         """Calcola media"""
-        #self.read_dataset = self.dataset.load_dataset()
+        self.read_dataset = self.dataset.load_dataset()
 
         try:
             while self.running:
@@ -454,6 +366,7 @@ class Bridge:
 
     def process_cycle(self, data):
 
+        self.last_gas_value = data["gas"]
 
         # ===============================
         # Pubblicazione telemetria MQTT
@@ -461,6 +374,7 @@ class Bridge:
         payload = {
         "garage_id": "G1",
         "gas": data["gas"], #valore del gas attuale
+        "threshold": self.read_dataset['others_mean'] * self.config.ANOMALY_FACTOR ,
         "timestamp": data["timestamp"],
         "fan_state": self.fan_controller.fan_state
         }
