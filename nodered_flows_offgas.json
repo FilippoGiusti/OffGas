@@ -1,0 +1,279 @@
+[
+    {
+        "id": "1262594100406cde",
+        "type": "tab",
+        "label": "Flow 2",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "0d7163f660650053",
+        "type": "mqtt in",
+        "z": "1262594100406cde",
+        "name": "",
+        "topic": "garages/G1/telemetry",
+        "qos": "2",
+        "datatype": "json",
+        "broker": "87bd664ca2c3b828",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 320,
+        "y": 140,
+        "wires": [
+            [
+                "695c29f5f26a8219",
+                "ae7fe3bbcadd59de"
+            ]
+        ]
+    },
+    {
+        "id": "695c29f5f26a8219",
+        "type": "debug",
+        "z": "1262594100406cde",
+        "name": "debug 3",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 960,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "275fa913b3df2fe5",
+        "type": "inject",
+        "z": "1262594100406cde",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "FAN_ON",
+        "payloadType": "str",
+        "x": 280,
+        "y": 260,
+        "wires": [
+            [
+                "7d52a9d413db4fcf"
+            ]
+        ]
+    },
+    {
+        "id": "7d52a9d413db4fcf",
+        "type": "mqtt out",
+        "z": "1262594100406cde",
+        "name": "",
+        "topic": "garages/G1/cmd",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "87bd664ca2c3b828",
+        "x": 610,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "c66a8721e48797b2",
+        "type": "inject",
+        "z": "1262594100406cde",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "FAN_OFF",
+        "payloadType": "str",
+        "x": 280,
+        "y": 360,
+        "wires": [
+            [
+                "8ddb0096542d3c12"
+            ]
+        ]
+    },
+    {
+        "id": "8ddb0096542d3c12",
+        "type": "mqtt out",
+        "z": "1262594100406cde",
+        "name": "",
+        "topic": "garages/G1/cmd",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "87bd664ca2c3b828",
+        "x": 610,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "cee170c7c8a149a2",
+        "type": "inject",
+        "z": "1262594100406cde",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "AUTO",
+        "payloadType": "str",
+        "x": 270,
+        "y": 460,
+        "wires": [
+            [
+                "205c9f6940c90f5b"
+            ]
+        ]
+    },
+    {
+        "id": "205c9f6940c90f5b",
+        "type": "mqtt out",
+        "z": "1262594100406cde",
+        "name": "",
+        "topic": "garages/G1/cmd",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "87bd664ca2c3b828",
+        "x": 590,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "c8db2ead656aa644",
+        "type": "function",
+        "z": "1262594100406cde",
+        "name": "AnomalyDetection",
+        "func": "var gas = msg.payload.gas;\nvar threshold = msg.payload.threshold;\n\nmsg.payload = {\n    mode: \"STD\",\n    anomaly: gas > threshold,\n    predicted_crossing: msg.payload.predicted_crossing\n};\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 590,
+        "y": 60,
+        "wires": [
+            [
+                "504564ad5e3d7aad"
+            ]
+        ]
+    },
+    {
+        "id": "504564ad5e3d7aad",
+        "type": "mqtt out",
+        "z": "1262594100406cde",
+        "name": "",
+        "topic": "garages/G1/cmd",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "87bd664ca2c3b828",
+        "x": 930,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "ae7fe3bbcadd59de",
+        "type": "function",
+        "z": "1262594100406cde",
+        "name": "PredictionNextValue",
+        "func": "// ======================================================\n// LETTURA VALORI DAL PAYLOAD MQTT\n// ======================================================\n\n// valore di gas letto dal sensore MQ2 (inviato dal Bridge)\nvar gas = msg.payload.gas;\n\n// soglia calcolata dal Bridge (media altri garage * k)\nvar threshold = msg.payload.threshold;\n\n\n\n// ======================================================\n// STORICO DEI VALORI GAS\n// ======================================================\n\n// recupera lo storico dei valori salvato nel context del nodo\n// se il nodo è appena partito lo inizializza come array vuoto\nvar history = context.get(\"gas_history\") || [];\n\n// recupera la media mobile del ciclo precedente\n// serve per calcolare la velocità di crescita del gas\nvar previousAvg = context.get(\"previous_avg\");\n\n// aggiunge il nuovo valore gas allo storico\nhistory.push(gas);\n\n// mantiene lo storico lungo al massimo 20 valori\n// rimuovendo il valore più vecchio\nif (history.length > 20) {\n    history.shift();\n}\n\n\n\n// ======================================================\n// NON CI SONO ABBASTANZA DATI PER CALCOLARE UN TREND\n// ======================================================\n\n// se abbiamo meno di 5 valori non possiamo ancora stimare\n// l'andamento del gas\nif (history.length < 5) {\n\n    // salva lo storico aggiornato\n    context.set(\"gas_history\", history);\n\n    // nessuna anomalia rilevata\n    msg.payload.mode = \"STD\";\n    msg.payload.anomaly = false;\n\n    // nessuna previsione di superamento soglia\n    msg.payload.predicted_crossing = false;\n\n    return msg;\n}\n\n\n\n// ======================================================\n// CALCOLO MEDIA MOBILE\n// ======================================================\n\n// calcola la media dei valori nello storico\n// (moving average degli ultimi N valori)\nvar sum = 0;\n\nfor (var i = 0; i < history.length; i++) {\n    sum += history[i];\n}\n\nvar movingAvg = sum / history.length;\n\n\n\n// ======================================================\n// PRIMA ITERAZIONE DEL TREND\n// ======================================================\n\n// se non esiste una media precedente non possiamo\n// ancora calcolare la velocità di crescita\nif (previousAvg == null) {\n\n    context.set(\"previous_avg\", movingAvg);\n    context.set(\"gas_history\", history);\n\n    msg.payload.mode = \"STD\";\n    msg.payload.anomaly = false;\n    msg.payload.predicted_crossing = false;\n\n    return msg;\n}\n\n\n\n// ======================================================\n// VELOCITÀ DI CRESCITA DEL GAS\n// ======================================================\n\n// differenza tra la media attuale e quella precedente\n// se positiva significa che il gas sta aumentando\nvar growthRate = movingAvg - previousAvg;\n\n// aggiorna i valori salvati nel context per il prossimo ciclo\ncontext.set(\"previous_avg\", movingAvg);\ncontext.set(\"gas_history\", history);\n\n\n\n// ======================================================\n// PREDIZIONE DEL VALORE FUTURO\n// ======================================================\n\n// stima il valore del gas tra circa 30 secondi\n// (150 cicli * 0.2 sec per ciclo)\nvar predictedGas = gas + (growthRate * 150);\n\n// aggiunge al payload il valore predetto\nmsg.payload.predicted_gas = Math.round(predictedGas);\n\n\n\n// ======================================================\n// DECISIONE ANOMALIA\n// ======================================================\n\n// se il valore previsto supera la soglia\n// segnaliamo al Bridge che si verificherà una condizione di anomalia\nif (predictedGas > threshold) {\n\n    msg.payload.mode = \"STD\";\n    msg.payload.anomaly = true;\n\n    // indica che la soglia verrà superata nel futuro\n    msg.payload.predicted_crossing = true;\n\n} else {\n\n    msg.payload.mode = \"STD\";\n    msg.payload.anomaly = false;\n\n    msg.payload.predicted_crossing = false;\n}\n\n\n\n// ======================================================\n// PAYLOAD INVIATO AL BRIDGE\n// ======================================================\n//\n// Il messaggio JSON inviato al Bridge contiene:\n//\n// mode               → modalità operativa (STD = decisione automatica)\n// anomaly            → True/False → indica se la ventola deve accendersi\n// predicted_crossing → True/False → indica se il gas supererà la soglia\n// predicted_gas      → valore stimato del gas tra ~30 secondi\n//\n// esempio payload finale:\n//\n// {\n//   \"mode\": \"STD\",\n//   \"anomaly\": false,\n//   \"predicted_crossing\": true,\n//   \"predicted_gas\": 245\n// }\n//\n// Il Bridge utilizza:\n// anomaly OR predicted_crossing\n//\n// per decidere se accendere la ventola.\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 360,
+        "y": 60,
+        "wires": [
+            [
+                "c8db2ead656aa644"
+            ]
+        ]
+    },
+    {
+        "id": "87bd664ca2c3b828",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "localhost",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    }
+]
