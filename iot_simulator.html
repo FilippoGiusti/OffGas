@@ -98,9 +98,9 @@ function generateData() {
 }
 
 function downloadCSV() {
-  let csv = "garage_id;gas_value\n"
+  let csv = "garage_id,gas_value\n"
   dataset.forEach(d => {
-    csv += `${d.garage};${d.gas}\n`
+    csv += `${d.garage},${d.gas}\n`
   })
 
   let blob = new Blob([csv], { type: "text/csv" })
