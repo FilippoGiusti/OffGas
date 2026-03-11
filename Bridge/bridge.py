@@ -246,7 +246,7 @@ class MQTTManager:
                             return
 
                         print(
-                            f"[SERVER] anomaly detected → FAN_ON | gas={self.bridge.last_gas_value} threshold={self.bridge.read_dataset['others_mean']}")
+                            f"[SERVER] anomaly detected → FAN_ON | gas={self.bridge.last_gas_value} threshold={self.bridge.read_dataset['others_mean']* self.bridge.config.ANOMALY_FACTOR}")
 
                         print(f"[MQTT COMMAND] Received: {command}")
 
@@ -254,7 +254,7 @@ class MQTTManager:
 
                     else:
                         print(
-                            f"[SERVER] normal condition → FAN_OFF | gas={self.bridge.last_gas_value} threshold={self.bridge.read_dataset['others_mean']}")
+                            f"[SERVER] normal condition → FAN_OFF | gas={self.bridge.last_gas_value} threshold={self.bridge.read_dataset['others_mean']* self.bridge.config.ANOMALY_FACTOR}")
 
                         print(f"[MQTT COMMAND] Received: {command}")
 
