@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>IoT Garage Simulator</title>
+<style>
+body {
+  font-family: Arial;
+  margin: 40px;
+}
+
+table, th, td {
+  border: 1px solid black;
+  border-collapse: collapse;
+  padding: 6px;
+}
+
+button {
+  margin-top: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>IoT Garage Gas Simulator</h2>
+
+Soglia desiderata:
+<input type="number" id="desiredThreshold" value="150" step="1">
+
+Anomaly Factor:
+<input type="number" id="factor" value="1.5" step="0.1">
+
+<button onclick="generateData()">Aggiorna Dataset</button>
+<button onclick="downloadCSV()">Scarica CSV</button>
+
+<p>Soglia impostata: <span id="threshold">-</span></p>
+<p>Media calcolata: <span id="avgValue">-</span></p>
+<p>Dataset aggiornato automaticamente ogni 3 secondi</p>
+
+<table id="table">
+<thead>
+<tr>
+<th>garage_id</th>
+<th>gas_value</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<script>
+const garages = ["G2","G3","G4","G5","G6","G7","G8","G9","G10","G11"]
+let dataset = []
+
+function generateData() {
+  let desiredThreshold = parseFloat(document.getElementById("desiredThreshold").value)
+  let factor = parseFloat(document.getElementById("factor").value)
+  let avgTarget = desiredThreshold / factor
+
+  dataset = []
+  let tbody = document.querySelector("#table tbody")
+  tbody.innerHTML = ""
+
+  let n = garages.length
+  let sum = 0
+
+  // Generiamo i primi n-1 valori casuali attorno alla media target
+  for (let i = 0; i < n - 1; i++) {
+    let variation = 2 // variazione massima ±2
+    let value = Math.floor(avgTarget + (Math.random() * 2 - 1) * variation)
+    dataset.push({ garage: garages[i], gas: value })
+    sum += value
+  }
+
+  // Calcoliamo l'ultimo valore in modo che la media sia vicina a avgTarget
+  let lastValue = Math.round(avgTarget * n - sum)
+  
+  // Limitiamo l'ultimo valore a ±2 dalla media target
+  if (lastValue > avgTarget + 2) lastValue = Math.floor(avgTarget + 2)
+  if (lastValue < avgTarget - 2) lastValue = Math.ceil(avgTarget - 2)
+
+  dataset.push({ garage: garages[n - 1], gas: lastValue })
+
+  // Calcolo media effettiva e soglia
+  let avg = dataset.reduce((s,d)=>s+d.gas,0)/n
+  let threshold = avg * factor
+
+  document.getElementById("threshold").innerText = threshold.toFixed(2)
+  document.getElementById("avgValue").innerText = avg.toFixed(2)
+
+  // Popoliamo tabella
+  dataset.forEach(d => {
+    tbody.innerHTML += `<tr>
+      <td>${d.garage}</td>
+      <td>${d.gas}</td>
+    </tr>`
+  })
+}
+
+function downloadCSV() {
+  let csv = "garage_id;gas_value\n"
+  dataset.forEach(d => {
+    csv += `${d.garage};${d.gas}\n`
+  })
+
+  let blob = new Blob([csv], { type: "text/csv" })
+  let link = document.createElement("a")
+  link.href = URL.createObjectURL(blob)
+  link.download = "dataset_garage.csv"
+  link.click()
+}
+
+// Generazione iniziale
+generateData()
+
+// Aggiornamento automatico ogni 3 secondi
+setInterval(generateData, 3000)
+</script>
+
+</body>
+</html>
