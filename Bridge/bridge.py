@@ -101,7 +101,7 @@ class DatasetManager:
             base_dir,
             "..",
             "dataset_other_garage",
-            "dataset_low_pollution.csv"
+            "dataset_high_pollution.csv"
         ))
 
     def load_dataset(self):
