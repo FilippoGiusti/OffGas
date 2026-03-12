@@ -59,8 +59,33 @@ void loop() {
   if (now - ultimoTempoLettura >= intervalloLettura) {
 
     ultimoTempoLettura = now;
+    
+    //fase di mediazione --> evito l'invio di falsi positivi o valori anomarli
 
-    int valore = analogRead(mq2Pin);
+    int val[5];
+    int valore;
+
+    for(int i = 0; i < 5; i++){
+      valore = analogRead(mq2Pin);
+      val[i] = valore;
+      delay(5);
+    }
+
+    //ordino in ordine crescente il vettore val, agli estremi ho i valori anormali
+
+    for(int i = 0; i<4;i++){
+      for(int j = i+1; j < 5; j++){
+        if(val[i]>val[j]){
+          int a = val[i];
+          val[i] = val[j];
+          val[j] = a;
+        }
+      }
+    }
+
+    //medio sui valori nella norma
+
+    valore = (val[1]+val[2]+val[3])/3;
     lastGasValue = valore;
 
     bluetooth.print("MQ2:");
