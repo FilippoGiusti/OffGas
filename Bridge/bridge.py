@@ -236,14 +236,16 @@ class MQTTManager:
                 # ad esempio: {"mode": "STD", "anomaly": true}
 
                 command = json.loads(raw)
+                # Se siamo in manual override ignoriamo i comandi automatici. La ventola resta forzata da node-red
 
+                if self.fan_controller.manual_override:
+                    return
+                
                 # condizione aggiornata: anomaly OR predicted_crossing(arriva nel payload da node-red)
                 if command["mode"] == "STD":
                     if command["anomaly"] or command["predicted_crossing"]:
 
                         # Se siamo in manual override ignoriamo i comandi automatici. La ventola resta forzata da node-red
-                        if self.fan_controller.manual_override:
-                            return
 
                         print(
                             f"[SERVER] anomaly detected → FAN_ON | gas={self.bridge.last_gas_value} threshold={self.bridge.read_dataset['others_mean']* self.bridge.config.ANOMALY_FACTOR}")
