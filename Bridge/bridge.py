@@ -240,7 +240,7 @@ class MQTTManager:
 
                 if self.fan_controller.manual_override:
                     return
-                
+
                 # condizione aggiornata: anomaly OR predicted_crossing(arriva nel payload da node-red)
                 if command["mode"] == "STD":
                     if command["anomaly"] or command["predicted_crossing"]:
