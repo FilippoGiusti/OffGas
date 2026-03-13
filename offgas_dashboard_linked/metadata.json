@@ -1,0 +1,5 @@
+{
+  "name": "OffGas Dashboard",
+  "description": "A modern, minimal dashboard for monitoring sensor values from the OffGas project, featuring industrial gauges, threshold charts, and a status overview.",
+  "requestFramePermissions": []
+}
