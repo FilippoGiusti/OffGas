@@ -32,7 +32,7 @@ class Config:
 
     MQTT_BROKER = "localhost"
     MQTT_PORT = 1883
-
+    #a
     TOPIC_TELEMETRY = "garages/G1/telemetry" #G1 è il garage di questo purificatore, nel dataset sono presenti G2,G3...
     TOPIC_ALERTS = "garages/G1/alerts"
     TOPIC_COMMANDS = "garages/G1/cmd"
