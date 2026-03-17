@@ -1,0 +1,27 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: offgas-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  nodered:
+    build:
+      context: .
+      dockerfile: docker/node-red/Dockerfile
+    container_name: offgas-nodered
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      TZ: Europe/Rome
+      DATASET_DIR: /data/offgas-datasets
+    ports:
+      - "1880:1880"
+    volumes:
+      - ./docker/nodered-data:/data
+      - ./offgas_dashboard_linked/dist:/data/public/offgas-dashboard:ro
+      - ./dataset_other_garage:/data/offgas-datasets:ro
