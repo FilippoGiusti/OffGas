@@ -11,3 +11,5 @@ http://localhost:1880/offgas-dashboard/
 Fai partire bridge.py 
 
 Per collegamento a Telegram assicurarsi che nel nodo telegranBot su nodered sia inserito il token e il nome del proprio bot personale
+
+OffGas_Cloud_API_Flow_v2.json è il file attuale, corretto per la gestione dell'anomaly detection...
