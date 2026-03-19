@@ -30,7 +30,8 @@ class Config:
     SERIAL_PORT = "COM6"
     BAUD_RATE = 9600
 
-    MQTT_BROKER = "localhost"
+    MQTT_BROKER = "host.docker.internal" #se vuoi collegarti al node red su docker metti come MQTT BROKER "host.docker.internal"
+    # se vuoi collegarti su node-red in locale metti "localhost"
     MQTT_PORT = 1883
 
     TOPIC_TELEMETRY = "garages/G1/telemetry" #G1 è il garage di questo purificatore, nel dataset sono presenti G2,G3...
