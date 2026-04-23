@@ -1,8 +1,8 @@
 bluetooth collegato su Port COM6
 
-Premi su up.bat
+Apri up.bat ed eseguilo
 
-apri link
+apri link:
 
 http://127.0.0.1:1880/admin/#flow/120ca2f2695d22bc
 
