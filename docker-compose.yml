@@ -9,9 +9,7 @@ services:
       - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
 
   nodered:
-    build:
-      context: .
-      dockerfile: docker/node-red/Dockerfile
+    image: nodered/node-red:latest
     container_name: offgas-nodered
     restart: unless-stopped
     depends_on:

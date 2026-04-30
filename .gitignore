@@ -1,11 +1,74 @@
-# IDE
+# =========================
+# IDE / Editor
+# =========================
 .idea/
+.vscode/
 
-# Node
-node_modules/
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
 
+# =========================
 # Python
+# =========================
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
 
-docker/
+# =========================
+# Node / frontend
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# Local env / secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Docker / Node-RED runtime
+# Keep configuration, ignore local runtime state
+# =========================
+
+# Node-RED runtime caches and local packages
+docker/nodered-data/node_modules/
+docker/nodered-data/lib/
+docker/nodered-data/.config*/
+docker/nodered-data/.npm/
+docker/nodered-data/.cache/
+docker/nodered-data/logs/
+docker/nodered-data/context/
+docker/nodered-data/projects/
+docker/nodered-data/.sessions.json
+
+# Node-RED runtime flows and credentials
+# Ignore these if they may contain personal Telegram bot tokens / local secrets
+docker/nodered-data/flows*.json
+docker/nodered-data/*_cred.json
+docker/nodered-data/.config.runtime.json
+
+# Optional: ignore extra local backups
+docker/nodered-data/*.backup
+docker/nodered-data/*.bak
+docker/nodered-data/*.log
+
+# =========================
+# Keep these tracked on purpose
+# =========================
+#!docker/
+#!docker/mosquitto/
+#!docker/mosquitto/mosquitto.conf
+#!docker/nodered-data/
+#!docker/nodered-data/settings.js
+#!docker/node-red/
+#!docker/node-red/Dockerfile
