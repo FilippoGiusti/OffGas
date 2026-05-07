@@ -1,5 +1,8 @@
 bluetooth collegato su Port COM6
 
+Se non hai il container docker, costruiscilo facendo doppio click (esegui) up.bat nella cartella scripts.
+Se hai una versione precedente e vuoi ricostruirlo, esegui down.bat e poi up.bat.
+
 Avvia container docker: avvia node-red e broker mqtt(mosquitto)
 
 Apri Start Dashboard.bat ed eseguilo (doppio click su file Start Dashboard.bat)
@@ -15,3 +18,8 @@ Esegui bridge.py
 Per collegamento a Telegram assicurarsi che nel nodo telegranBot su nodered sia inserito il token e il nome del proprio bot personale
 
 OffGas_Cloud_API_Flow_v2.json è il file attuale, corretto per la gestione dell'anomaly detection...
+
+Se hai problemi di connessione con mosquitto su docker, disattiva il mosquitto in locale. Esegui su powershell come amministratore:
+
+Stop-Service mosquitto
+Set-Service mosquitto -StartupType Disabled

@@ -33,9 +33,8 @@ class Config:
     SERIAL_PORT = "COM6"
     BAUD_RATE = 9600
 
-    # Se Mosquitto gira in Docker usa "host.docker.internal"
-    # Se usi lo stack completamente locale usa "localhost"
-    MQTT_BROKER = "host.docker.internal"
+    #ci colleghiamo direttamente all'indirizzo presente nel mosquitto del container docker
+    MQTT_BROKER = "127.0.0.1"
     MQTT_PORT = 1883
 
     TOPIC_TELEMETRY = "garages/G1/telemetry"
@@ -325,6 +324,7 @@ class Bridge:
         self.system_logger = SystemLogger(self.config.LOG_FILE)
         self.running = True
         self.last_gas_value = None
+        self._csv_counter = 0
 
     def start(self):
         """Avvia il sistema."""
@@ -368,7 +368,10 @@ class Bridge:
         }
 
         self.mqtt.publish_telemetry(payload)
-        self.data_logger.save(payload)
+        self._csv_counter += 1
+        if self._csv_counter >= 10:
+            self.data_logger.save(payload)
+            self._csv_counter = 0
         self.system_logger.log(
             "TELEMETRY_SENT",
             gas=data["gas"],

@@ -1,7 +1,7 @@
 {
     "node-red": {
         "name": "node-red",
-        "version": "4.1.8",
+        "version": "4.1.9",
         "local": false,
         "user": false,
         "nodes": {
@@ -429,7 +429,7 @@
     },
     "node-red-contrib-telegrambot": {
         "name": "node-red-contrib-telegrambot",
-        "version": "17.1.2",
+        "version": "17.1.3",
         "local": true,
         "user": true,
         "nodes": {

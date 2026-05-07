@@ -4,6 +4,6 @@
     "version": "0.0.1",
     "private": true,
     "dependencies": {
-        "node-red-contrib-telegrambot": "~17.1.2"
+        "node-red-contrib-telegrambot": "~17.1.3"
     }
 }
