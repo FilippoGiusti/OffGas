@@ -1,9 +1,13 @@
 """
-Responsabilità del Bridge:
-- leggere il valore gas dall'Arduino via Bluetooth
-- pubblicare la telemetria via MQTT
-- ricevere comandi da Node-RED
-- controllare la ventola tramite Arduino
+OFFGAS SYSTEM BRIDGE
+
+Funzioni:
+- Legge sensore gas da Arduino via Bluetooth
+- Invia telemetria via MQTT
+- Riceve comandi da Node-RED
+- Controlla ventola
+- Salva dati su CSV (AI dataset)
+- Salva log di sistema su file testo
 """
 
 # ===============================
@@ -14,6 +18,8 @@ import serial
 import json
 import time
 import datetime
+import csv
+import os
 import paho.mqtt.client as mqtt
 
 
@@ -35,6 +41,82 @@ class Config:
     TOPIC_TELEMETRY = "garages/G1/telemetry"
     TOPIC_ALERTS = "garages/G1/alerts"
     TOPIC_COMMANDS = "garages/G1/cmd"
+
+    CSV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gas_data.csv")
+    LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "system_logs.txt")
+
+
+# ===============================
+# CSV LOGGER (AI DATASET)
+# ===============================
+
+class DataLogger:
+
+    def __init__(self, filename):
+
+        self.filename = filename
+
+        if not os.path.exists(self.filename):
+
+            with open(self.filename, "w", newline="") as file:
+
+                writer = csv.writer(file)
+
+                writer.writerow([
+                    "timestamp",
+                    "garage_id",
+                    "gas",
+                    "fan_state"
+                ])
+
+    def save(self, payload):
+
+        with open(self.filename, "a", newline="") as file:
+
+            writer = csv.writer(file)
+
+            writer.writerow([
+                payload["timestamp"],
+                payload["garage_id"],
+                payload["gas"],
+                payload["fan_state"]
+            ])
+
+
+# ===============================
+# SYSTEM LOGGER (EVENT LOG)
+# ===============================
+
+class SystemLogger:
+
+    def __init__(self, filename):
+
+        self.filename = filename
+
+        if not os.path.exists(self.filename):
+
+            with open(self.filename, "w") as f:
+
+                f.write(
+                    "OFFGAS SYSTEM LOGS\n"
+                    "============================================================\n\n"
+                )
+
+    def log(self, event, garage="G1", gas=None, topic=None, status="INFO"):
+
+        timestamp = datetime.datetime.now().isoformat()
+
+        line = (
+            f"[{timestamp}] "
+            f"EVENT={event} | "
+            f"GARAGE={garage} | "
+            f"GAS={gas} | "
+            f"TOPIC={topic} | "
+            f"STATUS={status}\n"
+        )
+
+        with open(self.filename, "a") as f:
+            f.write(line)
 
 
 # ===============================
@@ -239,13 +321,28 @@ class Bridge:
         self.bluetooth = BluetoothManager(self.config)
         self.fan_controller = FanController(self.bluetooth, self.config)
         self.mqtt = MQTTManager(self.config, self.fan_controller, self)
+        self.data_logger = DataLogger(self.config.CSV_FILE)
+        self.system_logger = SystemLogger(self.config.LOG_FILE)
         self.running = True
         self.last_gas_value = None
 
     def start(self):
         """Avvia il sistema."""
         self.bluetooth.connect()
-        self.mqtt.connect()
+        print(f"[BLUETOOTH] Connesso ad Arduino su {self.config.SERIAL_PORT}")
+        self.system_logger.log("BLUETOOTH_CONNECTED", topic=None, status="INFO")
+
+        try:
+            self.mqtt.connect()
+        except Exception as e:
+            print(f"[MQTT ERROR] Impossibile connettersi al broker {self.config.MQTT_BROKER}:{self.config.MQTT_PORT} → {e}")
+            self.system_logger.log("MQTT_CONNECT_FAILED", topic=self.config.MQTT_BROKER, status="ERROR")
+            if self.bluetooth.ser:
+                self.bluetooth.ser.close()
+            return
+
+        self.system_logger.log("MQTT_CONNECTED", topic=self.config.TOPIC_TELEMETRY, status="INFO")
+
         self.mqtt.subscribe_commands()
 
         try:
@@ -271,11 +368,19 @@ class Bridge:
         }
 
         self.mqtt.publish_telemetry(payload)
+        self.data_logger.save(payload)
+        self.system_logger.log(
+            "TELEMETRY_SENT",
+            gas=data["gas"],
+            topic=self.config.TOPIC_TELEMETRY,
+            status="INFO"
+        )
 
     def stop(self):
         """Arresta il sistema."""
         print("Arresto manuale")
         self.fan_controller.force_off()
+        self.system_logger.log("BRIDGE_STOPPED", status="INFO")
         if self.bluetooth.ser:
             self.bluetooth.ser.close()
 
