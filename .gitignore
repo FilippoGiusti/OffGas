@@ -9,3 +9,7 @@ __pycache__/
 *.pyc
 
 docker/
+
+# Bridge - device-specific data (not shared across devices)
+gas_data.csv
+system_logs.txt
