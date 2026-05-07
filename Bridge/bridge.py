@@ -245,7 +245,16 @@ class Bridge:
     def start(self):
         """Avvia il sistema."""
         self.bluetooth.connect()
-        self.mqtt.connect()
+        print(f"[BLUETOOTH] Connesso ad Arduino su {self.config.SERIAL_PORT}")
+
+        try:
+            self.mqtt.connect()
+        except Exception as e:
+            print(f"[MQTT ERROR] Impossibile connettersi al broker {self.config.MQTT_BROKER}:{self.config.MQTT_PORT} → {e}")
+            if self.bluetooth.ser:
+                self.bluetooth.ser.close()
+            return
+
         self.mqtt.subscribe_commands()
 
         try:

@@ -1,14 +1,16 @@
 bluetooth collegato su Port COM6
 
-Apri up.bat ed eseguilo
+Avvia container docker: avvia node-red e broker mqtt(mosquitto)
 
-apri link:
+Apri Start Dashboard.bat ed eseguilo (doppio click su file Start Dashboard.bat)
+
+Apri link:
 
 http://127.0.0.1:1880/admin/#flow/120ca2f2695d22bc
 
 http://localhost:1880/offgas-dashboard/
 
-Fai partire bridge.py 
+Esegui bridge.py 
 
 Per collegamento a Telegram assicurarsi che nel nodo telegranBot su nodered sia inserito il token e il nome del proprio bot personale
 
