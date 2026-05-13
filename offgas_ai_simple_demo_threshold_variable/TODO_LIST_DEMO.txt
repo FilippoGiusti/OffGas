@@ -1,0 +1,168 @@
+# TODO LIST - Come avviare e spiegare la demo OffGas AI
+
+Questa TODO list serve per eseguire la demo AI in modo ordinato e per ricordare cosa spiegare durante l'esame.
+
+
+## 1. Controllare la cartella
+
+La cartella deve contenere questi file:
+
+- gas_data.csv
+- train_randomforest.py
+- predict_demo.py
+- gas_rf_model.pkl
+- README_OFFGAS_AI_SIMPLE_DEMO.txt
+- TODO_LIST_DEMO.txt
+
+Il progetto principale OffGas non deve essere modificato.
+Questa demo è separata e non interagisce con Arduino, Bridge, MQTT, Node-RED o Dashboard.
+
+
+## 2. Installare le librerie necessarie
+
+Da terminale, dentro la cartella della demo, eseguire:
+
+pip install pandas scikit-learn joblib
+
+Queste librerie servono per:
+
+- pandas: leggere e preparare il CSV
+- scikit-learn: usare RandomForestRegressor
+- joblib: salvare e caricare il modello .pkl
+
+
+## 3. Allenare il modello
+
+Eseguire:
+
+python train_randomforest.py
+
+Questo comando legge `gas_data.csv`, costruisce le feature temporali e allena il modello RandomForest.
+Alla fine crea o aggiorna il file:
+
+gas_rf_model.pkl
+
+Questo file è il modello già allenato.
+
+
+## 4. Eseguire la demo di predizione
+
+Eseguire:
+
+python predict_demo.py
+
+Lo script carica `gas_rf_model.pkl`, prende gli ultimi 4 valori di gas dal CSV e predice il valore di G1
+tra circa 30 secondi.
+
+Output atteso:
+
+OFFGAS AI FUTURE DEMO
+--------------------------------
+This is a separate RandomForest proof of concept.
+It does not modify the real OffGas runtime system.
+
+Last 4 gas values used: [...]
+Current gas value: ...
+Predicted gas value in 30 seconds: ...
+Demo threshold configured in code: 220.00
+Predicted crossing: False
+
+
+## 5. Dove si cambia la soglia
+
+La soglia è scritta direttamente dentro `predict_demo.py` come variabile:
+
+THRESHOLD = 220.0
+
+Questo è un valore fittizio/dimostrativo deciso da noi.
+Serve solo per mostrare il confronto:
+
+predicted_gas >= THRESHOLD
+
+Se vuoi provare una soglia diversa, modifica quella riga, per esempio:
+
+THRESHOLD = 180.0
+
+poi esegui di nuovo:
+
+python predict_demo.py
+
+
+## 6. Cosa è fittizio nella demo
+
+Nella demo sono fittizi o decisi manualmente:
+
+1. La soglia THRESHOLD
+   - Nel progetto reale sarebbe calcolata da Node-RED.
+   - Nella demo è un valore fisso scelto da noi.
+
+2. L'uso offline del CSV
+   - La demo non legge dati live dal Bridge.
+   - Usa il file storico `gas_data.csv`. Anche la raccolta dei file è fittizia andrebbe fatta lato server.
+
+3. Il confronto finale `predicted_crossing`
+   - Serve solo a dimostrare il concetto.
+   - Non comanda la ventola.
+   - Non modifica la dashboard.
+
+
+## 7. Cosa è reale nella demo
+
+Nella demo sono reali:
+
+1. I dati storici
+   - `gas_data.csv` è prodotto dal bridge del progetto.
+
+2. Il training
+   - `train_randomforest.py` allena davvero un RandomForestRegressor.
+
+3. Il file .pkl
+   - `gas_rf_model.pkl` contiene davvero il modello allenato.
+
+4. La predizione
+   - `predict_demo.py` carica davvero il modello e calcola una predizione numerica.
+
+
+## 8. Spiegazione dei 30 secondi
+
+Arduino invia un valore del gas circa ogni 5 secondi.
+Per predire il valore a 30 secondi usiamo 6 campioni in avanti:
+
+6 campioni * 5 secondi = circa 30 secondi
+
+Nel training questo viene fatto con:
+
+PREDICTION_STEPS = 6
+
+e con:
+
+df["target_gas_in_30s"] = df["gas"].shift(-PREDICTION_STEPS)
+
+
+## 9. Spiegazione del file .pkl
+
+Il file `.pkl` viene creato da Python quando si esegue:
+
+python train_randomforest.py
+
+Non viene scritto manualmente.
+
+Serve per salvare il modello già allenato, così nella fase di demo non è necessario riaddestrarlo.
+
+Flusso:
+
+gas_data.csv -> train_randomforest.py -> gas_rf_model.pkl -> predict_demo.py -> predizione
+
+Nel codice il salvataggio avviene con:
+
+joblib.dump(model_package, MODEL_FILE)
+
+Il caricamento avviene con:
+
+joblib.load("gas_rf_model.pkl")
+
+
+Questa parte non modifica il progetto principale. È una proof of concept separata per mostrare che i dati storici
+raccolti dal bridge possono essere usati per addestrare un modello RandomForest. Il modello prende gli ultimi valori
+del gas e predice il valore di G1 circa 30 secondi nel futuro. La soglia usata nella demo è fissa e decisa da noi,
+solo per simulare il confronto finale; nel sistema reale sarebbe calcolata dinamicamente da Node-RED.
