@@ -1,52 +1,64 @@
-# 🚗💨 OffGas
+<div align="center">
+  <img src="./Doc/assets/offgas-logo.png" alt="OffGas Logo" width="200"/>
+</div>
+<div align="center" style="margin-top: -30px;">
+  <img src="./Doc/assets/offgas-font-logo.png" alt="OffGas Wordmark" width="300"/>
+</div>
+<div align="center" style="margin-top: -30px;">
+  <b>An IoT monitoring, prediction, and control system for detecting possible EV off-gassing events in underground garage environments.</b>
+</div>
 
-> **An IoT monitoring and control system for detecting possible offgassing events in EV garage environments.**
+<p align="center">
+  Arduino · Python Bridge · MQTT · Node-RED · React Dashboard · Docker · AI Demo
+</p>
 
 ---
 
-## Overview
+## 📘 Overview
 
-**OffGas** is an academic IoT project built to monitor gas concentration inside a garage-like environment and react when the observed values suggest a potentially dangerous condition.
+**OffGas** is an academic IoT project focused on early gas-risk detection in enclosed EV parking environments.
 
-The project is centered on a **single real prototype unit, G1**, equipped with a gas sensor and a ventilation fan. To give the operator a meaningful comparison baseline, the interface also shows **five additional units, G2-G6**, which are **simulated from CSV datasets**.
+The current system is built around **one real monitored unit, G1**, equipped with an MQ-2 gas sensor and a ventilation fan. To provide contextual comparison, the platform also visualizes **five additional units, G2-G6**, which are generated from CSV datasets and used as simulated surrounding garages.
 
-This distinction is fundamental to the current version of the project:
+This distinction is central to the current implementation:
 
-- **G1** is the **only physical monitored unit**.
-- **G2-G6** are **simulated comparison units** generated from datasets.
-- The dashboard is intentionally limited to **6 displayed units total** to keep the system readable and didactically clear.
+- **G1** is the **only physical prototype unit**
+- **G2-G6** are **simulated comparison units**
+- the dashboard intentionally focuses on **6 total displayed units** to keep the system readable and didactically clear
 
 OffGas combines:
 
 - **Arduino** for sensing and actuation
-- **HC-05 Bluetooth** for the link between Arduino and the host machine
-- **Python Bridge** for hardware-to-MQTT communication
-- **Node-RED** for orchestration, logic, APIs, dataset management, and threshold handling
+- **HC-05 Bluetooth** for local wireless communication with the prototype
+- **Python Bridge** for Bluetooth-to-MQTT communication
+- **Node-RED** for orchestration, logic, APIs, dataset management, and state building
 - **React + Vite dashboard** for monitoring and operator control
-- **Docker** for a reproducible software runtime
+- **Mosquitto MQTT** for messaging
+- **Docker** for a reproducible backend runtime
+- an **AI demo layer** for future data-driven forecasting and anomaly-oriented evolution
 
 ---
 
-## Project Goal
+## 🎯 Project Goal
 
-The goal of OffGas is not just to read a gas value, but to interpret it inside a distributed comparison model.
+The goal of OffGas is not only to read a gas value, but to interpret it inside a contextual monitoring model.
 
 The system tries to distinguish between:
 
-- a **local abnormal increase** in the monitored garage (**possible offgassing event in G1**), and
-- a **broader environmental variation** that also affects the comparison units.
+- a **local abnormal increase** in the monitored garage
+- a **broader environmental variation** consistent with the surrounding comparison scenario
 
-In practical terms, the project asks:
+In practical terms, the system asks:
 
-> **Is the gas increase specific to the monitored garage, or is it consistent with the surrounding comparison scenario?**
+> **Is the gas increase specific to G1, or is it consistent with the surrounding garage context?**
 
-To support this reasoning, the live data from **G1** is evaluated against the behavior of the simulated units **G2-G6**.
+To support this reasoning, the live telemetry from **G1** is evaluated together with the behavior of **G2-G6**, which are simulated from datasets.
 
 ---
 
-## Current Architecture at a Glance
+## 🧱 Current Architecture at a Glance
 
-The project is organized into four main layers.
+The project is organized into four main operational layers.
 
 ### 1. Arduino
 
@@ -55,11 +67,13 @@ Arduino is the **edge device** connected to the physical prototype.
 It is responsible for:
 
 - reading the **MQ-2 gas sensor**
-- sending measurements via **HC-05 Bluetooth**
-- receiving fan commands from the host machine
+- applying local filtered acquisition logic
+- sending measurements through **HC-05 Bluetooth**
+- receiving fan commands from the bridge
 - switching the ventilation hardware on or off
+- updating the local display and status indicators
 
-Arduino does **not** implement the system logic.
+Arduino does **not** implement the high-level decision logic.
 
 ### 2. Python Bridge
 
@@ -75,7 +89,7 @@ Its responsibilities are intentionally limited:
 - receiving commands from Node-RED
 - forwarding those commands back to Arduino
 
-In the current architecture, the bridge is **not** responsible for dataset loading, threshold computation, prediction, or global dashboard state construction.
+In the current architecture, the bridge is **not** responsible for dataset loading, threshold computation, prediction, or dashboard state construction.
 
 ### 3. Node-RED
 
@@ -84,16 +98,14 @@ Node-RED is the **core orchestration layer** of OffGas.
 It receives telemetry from the bridge and performs the main application logic, including:
 
 - telemetry caching
-- threshold computation
-- prediction and anomaly detection
 - dataset loading and switching
-- state generation for the dashboard
+- contextual threshold computation
+- prediction and anomaly-oriented evaluation
+- dashboard state generation
 - manual and automatic control handling
-- emergency shutoff management
+- emergency shutoff logic
 - optional Telegram notifications
 - HTTP API exposure for the frontend
-
-This is the most important architectural point in the current version of the project:
 
 > **Threshold logic and dataset management now belong entirely to Node-RED.**
 
@@ -110,7 +122,8 @@ It shows:
 - manual control (`OFF / AUTO / ON`)
 - emergency shutoff state
 - dataset selection for the simulated units
-- backend connectivity information
+- backend connectivity and update information
+- temporal analysis and graph view
 
 The dashboard is served by Node-RED at:
 
@@ -120,7 +133,7 @@ http://localhost:1880/offgas-dashboard/
 
 ---
 
-## Real Unit vs Simulated Units
+## 🧪 Real Unit vs Simulated Units
 
 ### G1: real prototype
 
@@ -142,11 +155,11 @@ They are generated from CSV datasets stored in:
 dataset_other_garage/
 ```
 
-Node-RED loads the selected dataset, excludes G1 from the simulated pool, and builds the comparison state shown in the dashboard.
+Node-RED loads the selected dataset, rebuilds the simulated context, and uses that information to evaluate G1 inside a broader reference scenario.
 
 ---
 
-## How Threshold and Dataset Logic Work Now
+## 📐 Contextual Threshold Logic
 
 In the current implementation, **Node-RED** is responsible for both:
 
@@ -157,26 +170,25 @@ The general idea is:
 
 ```text
 others_mean = average concentration of the comparison units
-threshold = others_mean × ANOMALY_FACTOR
+effective_threshold = others_mean × ANOMALY_FACTOR
 ```
 
-This means the safety threshold is **contextual**, not hardcoded.
+This means the safety threshold is **contextual**, not fixed.
 
 The active dataset defines the simulated environmental scenario for **G2-G6**, while Node-RED uses that scenario to build:
 
 - the comparison values for the simulated units
 - the average concentration shown in the UI
-- the effective threshold used to evaluate G1 and the other displayed units
-
-This is different from earlier versions of the architecture, where part of this responsibility was described inside the bridge.
+- the effective threshold used to evaluate G1
+- the global state shown in the dashboard
 
 ---
 
-## Prediction and Detection Logic
+## 📈 Rule-Based Prediction and Detection
 
-Node-RED also performs predictive analysis on the incoming telemetry of **G1**.
+Node-RED already performs predictive analysis on the incoming telemetry of **G1**.
 
-The logic is based on:
+The current logic is based on:
 
 - a short history of recent gas values
 - a **moving average**
@@ -187,15 +199,15 @@ In simplified form:
 
 ```text
 growthRate = movingAvg - previousAvg
-predictedGas = gas + (growthRate × 150)
+predicted_gas = gas + (growthRate × 150)
 ```
 
-This allows the system to distinguish between two main situations:
+This allows the system to distinguish between two important situations.
 
 ### Critical anomaly
 
 ```text
-gas > threshold
+gas > effective_threshold
 ```
 
 The gas value is already above the safety threshold.
@@ -203,24 +215,22 @@ The gas value is already above the safety threshold.
 ### Predictive warning
 
 ```text
-predictedGas > threshold
+predicted_gas > effective_threshold
 ```
 
-The gas value is still below threshold now, but the trend suggests that it may cross the threshold soon.
+The gas value is still below threshold, but the trend suggests that it may cross the threshold soon.
 
 This enables **preventive ventilation**, not only reactive ventilation.
 
 ---
 
-## Main MQTT Topics
+## 📡 Main MQTT Topics
 
 The project uses three main MQTT topics around the real prototype unit:
 
 - `garages/G1/telemetry`
 - `garages/G1/alerts`
 - `garages/G1/cmd`
-
-Their roles are:
 
 | Topic | Direction | Purpose |
 |---|---|---|
@@ -230,9 +240,9 @@ Their roles are:
 
 ---
 
-## Dashboard and API Layer
+## 🖥️ Dashboard and API Layer
 
-The dashboard does not talk directly to MQTT and does not communicate directly with Arduino or the bridge.
+The dashboard does not communicate directly with MQTT, Arduino, or the bridge.
 
 It interacts with Node-RED through HTTP/JSON APIs such as:
 
@@ -243,24 +253,24 @@ It interacts with Node-RED through HTTP/JSON APIs such as:
 - `POST /api/emergency`
 - `GET /api/health`
 
-This separation keeps the frontend focused on presentation and interaction, while Node-RED remains the single source of truth for the system state.
+This separation keeps the frontend focused on presentation and interaction, while Node-RED remains the single source of truth for system state.
 
 ---
 
-## Docker Runtime
+## 🐳 Docker Runtime
 
-The project includes a **Docker-based setup** designed to be **additive** rather than invasive.
+The project includes a **Docker-based backend** designed to be reproducible and easy to share across team members.
 
 The idea is:
 
-- keep the **bridge local** on the machine connected to the HC-05 module
+- keep the **bridge local** on the machine physically connected to the HC-05 module
 - run **Node-RED + Mosquitto + dashboard serving** through Docker
-- avoid restructuring the original project folders
+- preserve direct access to the real prototype while making the backend portable
 
 ### What stays local
 
-- `Bridge/` remains the original local gateway for the real prototype
-- Bluetooth communication remains outside Docker
+- `Bridge/` remains the local gateway for the physical prototype
+- Bluetooth communication stays outside Docker
 - the operator still runs the bridge manually on the host machine
 
 ### What Docker provides
@@ -272,7 +282,98 @@ The idea is:
 
 ---
 
-## Quick Start
+## 🔌 Bridge MQTT Configuration
+
+The bridge runs locally on the host machine connected to the HC-05 module.
+
+For this reason, the MQTT broker is expected to be reached through the host itself, using:
+
+- `127.0.0.1`
+- or `localhost`
+
+The bridge configuration should therefore use:
+
+```python
+MQTT_BROKER = "127.0.0.1"
+```
+
+or, equivalently:
+
+```python
+MQTT_BROKER = "localhost"
+```
+
+---
+
+## 🤖 AI Demo and Future Data-Driven Evolution
+
+The repository also includes an **AI demo module** in:
+
+```text
+offgas_ai_demo/
+```
+
+This part is not the main runtime of OffGas, but a proof of concept that demonstrates how the system can evolve from **rule-based prediction** to **data-driven prediction**.
+
+The demo is based on:
+
+- historical telemetry stored in `gas_data.csv`
+- a training script for a **RandomForestRegressor**
+- a prediction demo script for estimating future gas values
+
+The goal of this module is to predict the gas concentration of **G1** about **30 seconds into the future** using recent historical values as input.
+
+This supports an important conceptual evolution:
+
+- **today**: prediction is computed through handcrafted logic in Node-RED
+- **future**: prediction can be assisted by a trained ML model
+
+In this approach:
+
+- the **AI predicts**
+- **Node-RED still decides**
+
+This preserves the current architecture while extending it with an additional backend intelligence layer.
+
+---
+
+## 🧠 Future AI-Based Anomaly Detection
+
+Beyond forecasting, OffGas also opens the door to a more advanced anomaly-oriented layer.
+
+A future server-side AI module, for example based on **Isolation Forest**, could learn what normal gas behavior looks like from historical telemetry and logs.
+
+Instead of checking only whether a gas value exceeds a threshold, the system could also ask whether the current value and its recent trend are unusual with respect to learned normal behavior.
+
+This would make the platform:
+
+- more adaptive
+- more robust to irregular patterns
+- less dependent on fixed handcrafted rules alone
+- more suitable for false-alarm reduction and maintenance support
+
+The long-term goal is therefore not only to predict the next value, but also to understand when the overall system behavior becomes abnormal.
+
+---
+
+## 🔄 Typical Runtime Flow
+
+A simplified end-to-end flow is:
+
+1. Arduino reads the MQ-2 sensor.
+2. Arduino sends the filtered value over Bluetooth through HC-05.
+3. The Python bridge receives and validates the message.
+4. The bridge publishes G1 telemetry via MQTT.
+5. Node-RED receives the telemetry.
+6. Node-RED updates datasets, comparison state, threshold, prediction, and system state.
+7. Node-RED rebuilds the dashboard state.
+8. Node-RED sends automatic or manual commands back through MQTT.
+9. The bridge forwards the command to Arduino.
+10. Arduino updates the fan state on the real prototype.
+
+---
+
+## 🚀 Quick Start
 
 ### 1. Start the Docker stack
 
@@ -287,8 +388,6 @@ scripts\up.bat
 ```bash
 ./scripts/up.sh
 ```
-
-This starts the software stack used by the shared environment.
 
 ### 2. Rebuild the dashboard if the frontend changed
 
@@ -317,7 +416,7 @@ The bridge must be started on the machine that is physically paired with the **H
 #### Node-RED editor
 
 ```text
-http://127.0.0.1:1880/admin/#flow/120ca2f2695d22bc
+http://127.0.0.1:1880/admin/
 ```
 
 #### Dashboard
@@ -328,70 +427,22 @@ http://localhost:1880/offgas-dashboard/
 
 ---
 
-## Configuration Note
-
-One detail deserves attention: the bridge MQTT host must match the runtime you are actually using.
-
-Depending on your setup, the broker may need to be reached as:
-
-- `localhost`
-- `127.0.0.1`
-- `host.docker.internal`
-
-So before running the real prototype, check the bridge MQTT configuration and make sure it is coherent with how Mosquitto is exposed on your machine.
-
----
-
-## Typical Runtime Flow
-
-A simplified end-to-end flow is:
-
-1. Arduino reads the MQ-2 sensor.
-2. Arduino sends the value over Bluetooth through HC-05.
-3. The Python bridge receives and validates the value.
-4. The bridge publishes G1 telemetry via MQTT.
-5. Node-RED receives the telemetry.
-6. Node-RED updates datasets, comparison state, threshold, and prediction.
-7. Node-RED rebuilds the dashboard state.
-8. Node-RED sends automatic or manual commands back to the bridge.
-9. The bridge forwards the command to Arduino.
-10. The fan state is updated on the real prototype.
-
----
-
-## Main Project Folders
+## 📂 Main Project Folders
 
 ```text
 Bridge/                    # Python bridge for the real prototype
 Doc/                       # Project documentation and technical PDFs
 arduino_ide_offgas/        # Arduino firmware
-batchfile/                 # Legacy helper files
-build/                     # Frontend build artifacts (when present)
 dataset_other_garage/      # CSV datasets for G2-G6 simulation
-docker/                    # Docker-specific runtime files (if present in local setup)
+docker/                    # Docker runtime files
+offgas_ai_demo/            # AI demo for future forecasting integration
 offgas_dashboard_linked/   # React + Vite dashboard source
 scripts/                   # Start/stop/rebuild helper scripts
 ```
 
-> Folder contents may vary slightly depending on whether you are looking at the plain repository snapshot or a local working setup enriched with Docker runtime files.
-
 ---
 
-## Documentation
-
-The repository includes dedicated technical documentation for the main subsystems, including:
-
-- Arduino firmware
-- Python bridge
-- Node-RED logic
-- dashboard frontend
-- Docker runtime
-
-These documents are meant to describe not only what each component contains, but also what role it plays inside the overall OffGas architecture.
-
----
-
-## Academic Context
+## 🎓 Academic Context
 
 This project was realized for the **UniMORE – IoT Course (2025/2026)**.
 
@@ -400,7 +451,7 @@ This project was realized for the **UniMORE – IoT Course (2025/2026)**.
 
 ---
 
-## Contributors
+## 👥 Contributors
 
 - **Elena Bernini**
 - **Filippo Giusti**
