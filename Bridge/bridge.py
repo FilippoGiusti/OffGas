@@ -33,7 +33,7 @@ class Config:
     SERIAL_PORT = "COM6"
     BAUD_RATE = 9600
 
-    #ci colleghiamo direttamente all'indirizzo presente nel mosquitto del container docker
+    # Ci colleghiamo direttamente all'indirizzo presente nel mosquitto del container docker
     MQTT_BROKER = "127.0.0.1"
     MQTT_PORT = 1883
 

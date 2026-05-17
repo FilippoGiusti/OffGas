@@ -106,6 +106,8 @@ La classe `Config` raccoglie i parametri configurabili del bridge, ad esempio:
 - host e porta del broker MQTT;
 - topic MQTT di telemetria, alert e comandi.
 
+Nel file `bridge.py` attuale del repository, il broker MQTT e' configurato di default come `127.0.0.1:1883`.
+
 Questa scelta evita di disperdere i parametri nel codice e rende piu' semplice l'adattamento del bridge a contesti diversi.
 
 ## 5.2 Classe `BluetoothManager`
@@ -305,10 +307,15 @@ Il bridge si collega a un broker MQTT configurato tramite `MQTT_BROKER` e `MQTT_
 
 Nel progetto OffGas il bridge viene eseguito **localmente** sulla macchina collegata al modulo HC-05, mentre Node-RED e Mosquitto possono essere eseguiti localmente oppure in Docker.
 
-Per questo motivo il valore dell'host MQTT deve essere coerente con il tipo di avvio scelto:
+Per questo motivo il valore dell'host MQTT deve essere coerente con il tipo di avvio scelto.
 
-- `localhost` se il broker e' eseguito localmente fuori Docker;
-- `host.docker.internal` se il broker gira in Docker ed e' esposto sulla macchina host.
+Nel codice attuale del progetto, il valore predefinito di `MQTT_BROKER` nel file `bridge.py` e' `127.0.0.1`, che puo' essere equivalentemente sostituito con `localhost` quando il bridge viene eseguito sulla stessa macchina host che espone Mosquitto sulla porta `1883`.
+
+In pratica, per il setup documentato di OffGas:
+
+- `127.0.0.1` e' il valore consigliato e usato nel file `bridge.py` del repository;
+- `localhost` e' un'alternativa valida nello stesso scenario;
+- non viene piu' usato `host.docker.internal` come riferimento principale per la configurazione del bridge.
 
 Il ciclo di avvio del bridge e' composto da questi passaggi:
 
